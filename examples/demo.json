@@ -1,0 +1,18 @@
+{
+  "config_version": 1,
+  "source": "jsonl",
+  "source_id": "synthetic_orders",
+  "source_revision": "fixture_v1",
+  "schema": "dbo",
+  "table": "Orders",
+  "date_column": "CreatedAt",
+  "mapping": "mapping.xlsx",
+  "fixture": "orders.jsonl",
+  "output_dir": "../exports/demo",
+  "end": "2026-09-01T00:00:00Z",
+  "years": 3,
+  "granularity": "month",
+  "batch_size": 5000,
+  "order_by": ["CreatedAt", "OrderId"]
+}
+

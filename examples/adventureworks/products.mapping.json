@@ -1,0 +1,75 @@
+{
+  "metadata": {
+    "contract_version": 1,
+    "mapping_id": "aw_products",
+    "mapping_version": "1.0.0"
+  },
+  "columns": [
+    {
+      "ordinal": 1,
+      "source": null,
+      "target": "product_uid",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "keys": [
+            "ProductID"
+          ],
+          "namespace": "adventureworks/product",
+          "op": "identity"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 2,
+      "source": "ProductID",
+      "target": "product_id",
+      "type": "integer",
+      "nullable": false,
+      "rules": [],
+      "scale": null
+    },
+    {
+      "ordinal": 3,
+      "source": "ProductNumber",
+      "target": "catalog_reference",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "op": "prefix",
+          "value": "AW-"
+        },
+        {
+          "op": "suffix",
+          "value": "-CAT"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 4,
+      "source": "Name",
+      "target": "name",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "op": "trim"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 5,
+      "source": "ListPrice",
+      "target": "list_price",
+      "type": "decimal",
+      "nullable": false,
+      "rules": [],
+      "scale": 2
+    }
+  ]
+}

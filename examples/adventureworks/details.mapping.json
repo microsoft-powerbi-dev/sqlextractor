@@ -1,0 +1,185 @@
+{
+  "metadata": {
+    "contract_version": 1,
+    "mapping_id": "aw_details",
+    "mapping_version": "1.0.0"
+  },
+  "columns": [
+    {
+      "ordinal": 1,
+      "source": null,
+      "target": "detail_uid",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "keys": [
+            "SalesOrderID",
+            "SalesOrderDetailID"
+          ],
+          "namespace": "adventureworks/order-line",
+          "op": "identity"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 2,
+      "source": null,
+      "target": "order_uid",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "keys": [
+            "SalesOrderID"
+          ],
+          "namespace": "adventureworks/order",
+          "op": "identity"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 3,
+      "source": null,
+      "target": "customer_uid",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "keys": [
+            "CustomerID"
+          ],
+          "namespace": "adventureworks/customer",
+          "op": "identity"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 4,
+      "source": null,
+      "target": "product_uid",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "keys": [
+            "ProductID"
+          ],
+          "namespace": "adventureworks/product",
+          "op": "identity"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 5,
+      "source": "SalesOrderID",
+      "target": "sales_order_id",
+      "type": "integer",
+      "nullable": false,
+      "rules": [],
+      "scale": null
+    },
+    {
+      "ordinal": 6,
+      "source": "SalesOrderDetailID",
+      "target": "sales_order_detail_id",
+      "type": "integer",
+      "nullable": false,
+      "rules": [],
+      "scale": null
+    },
+    {
+      "ordinal": 7,
+      "source": null,
+      "target": "line_reference",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "op": "template",
+          "value": "{SalesOrderID}/{SalesOrderDetailID}"
+        },
+        {
+          "op": "prefix",
+          "value": "AW-LINE-"
+        },
+        {
+          "op": "suffix",
+          "value": "-ITEM"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 8,
+      "source": "OrderDate",
+      "target": "order_date",
+      "type": "datetime",
+      "nullable": false,
+      "rules": [],
+      "scale": null
+    },
+    {
+      "ordinal": 9,
+      "source": "OrderQty",
+      "target": "quantity",
+      "type": "integer",
+      "nullable": false,
+      "rules": [],
+      "scale": null
+    },
+    {
+      "ordinal": 10,
+      "source": "UnitPrice",
+      "target": "unit_price",
+      "type": "decimal",
+      "nullable": false,
+      "rules": [],
+      "scale": 4
+    },
+    {
+      "ordinal": 11,
+      "source": "UnitPriceDiscount",
+      "target": "discount",
+      "type": "decimal",
+      "nullable": false,
+      "rules": [],
+      "scale": 4
+    },
+    {
+      "ordinal": 12,
+      "source": "LineTotal",
+      "target": "line_total",
+      "type": "decimal",
+      "nullable": false,
+      "rules": [],
+      "scale": 2
+    },
+    {
+      "ordinal": 13,
+      "source": "CarrierTrackingNumber",
+      "target": "tracking_reference",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "op": "default",
+          "value": "UNTRACKED"
+        },
+        {
+          "op": "prefix",
+          "value": "TRACK-"
+        },
+        {
+          "op": "suffix",
+          "value": "-AW"
+        }
+      ],
+      "scale": null
+    }
+  ]
+}

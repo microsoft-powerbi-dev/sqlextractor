@@ -1,0 +1,9 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {"name":"Validate mapping", "type":"debugpy", "request":"launch", "module":"sql_exporter", "args":["validate","--config","${input:exportConfig}"], "cwd":"${workspaceFolder}", "console":"integratedTerminal"},
+    {"name":"Preview export plan", "type":"debugpy", "request":"launch", "module":"sql_exporter", "args":["dry-run","--config","${input:exportConfig}"], "cwd":"${workspaceFolder}", "console":"integratedTerminal"},
+    {"name":"Export selected config", "type":"debugpy", "request":"launch", "module":"sql_exporter", "args":["export","--config","${input:exportConfig}"], "cwd":"${workspaceFolder}", "console":"integratedTerminal"}
+  ],
+  "inputs": [{"id":"exportConfig", "type":"promptString", "description":"Config path relative to repository root", "default":"examples/demo.json"}]
+}

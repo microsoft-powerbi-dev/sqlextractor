@@ -1,0 +1,15 @@
+{
+  "config_version": 1,
+  "source": "sqlserver",
+  "source_id": "aw_sql_orders",
+  "schema": "ExportAW",
+  "table": "Orders",
+  "date_column": "OrderDate",
+  "mapping": "orders.mapping.xlsx",
+  "output_dir": "../../exports/adventureworks-sql/orders",
+  "start": "2022-07-01",
+  "end": "2025-07-01",
+  "granularity": "month",
+  "batch_size": 5000,
+  "connection_env": "SQL_EXPORTER_CONNECTION_STRING"
+}

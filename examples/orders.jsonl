@@ -1,0 +1,8 @@
+{"OrderId":0,"CreatedAt":"2023-08-31T23:59:59.999999Z","Customer":"excluded before start","Amount":"1.00","Status":"A","Note":null}
+{"OrderId":1,"CreatedAt":"2023-09-01T00:00:00Z","Customer":"  José  ","Amount":"10.005","Status":"A","Note":"contains | pipe"}
+{"OrderId":2,"CreatedAt":"2023-09-30T23:59:59.999999Z","Customer":"Zoë","Amount":"-1.005","Status":"C","Note":"said \"hello\""}
+{"OrderId":3,"CreatedAt":"2023-10-01T00:00:00Z","Customer":"東京","Amount":"0","Status":"A","Note":"line one\nline two"}
+{"OrderId":4,"CreatedAt":"2024-02-29T12:30:00Z","Customer":"Leap day","Amount":"9007199254740993.01","Status":"P","Note":""}
+{"OrderId":5,"CreatedAt":"2026-08-31T23:59:59.999999Z","Customer":null,"Amount":"12.50","Status":"A","Note":null}
+{"OrderId":6,"CreatedAt":"2026-09-01T00:00:00Z","Customer":"excluded at end","Amount":"1","Status":"A","Note":null}
+{"OrderId":7,"CreatedAt":null,"Customer":"excluded null date","Amount":"1","Status":"A","Note":null}

@@ -1,0 +1,18 @@
+{
+  "config_version": 1,
+  "source": "sqlserver",
+  "source_id": "orders_warehouse",
+  "schema": "dbo",
+  "table": "Orders",
+  "date_column": "CreatedAt",
+  "mapping": "mapping.xlsx",
+  "output_dir": "../exports/orders",
+  "connection_env": "SQL_EXPORTER_CONNECTION_STRING",
+  "years": 3,
+  "granularity": "month",
+  "batch_size": 5000,
+  "order_by": ["CreatedAt", "OrderId"],
+  "timezone": "UTC",
+  "isolation": "read_committed"
+}
+

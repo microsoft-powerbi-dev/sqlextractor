@@ -1,0 +1,16 @@
+{
+  "config_version": 1,
+  "source": "jsonl",
+  "source_id": "aw_products",
+  "source_revision": "b47eadc85277f72843647223cde53aa1b85ffcb8",
+  "schema": "Production",
+  "table": "Product",
+  "date_column": "ExportDate",
+  "mapping": "products.mapping.xlsx",
+  "fixture": "data/products.jsonl",
+  "output_dir": "../../exports/adventureworks/products",
+  "start": "2025-07-01",
+  "end": "2025-07-02",
+  "granularity": "month",
+  "batch_size": 5000
+}

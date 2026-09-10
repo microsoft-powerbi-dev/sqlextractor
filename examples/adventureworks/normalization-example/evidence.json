@@ -1,0 +1,12 @@
+{
+  "provider": "codex",
+  "cli_version": "0.153.4",
+  "status": "completed",
+  "input": "../general_mapping.md",
+  "input_sha256": "3a01eda66d776f74c1e3682df905de5c3cd9619373cddcd59dee0c0dd6bdf9b2",
+  "semantic_fingerprint": "a819c8f59236107555aef4053674c7bd597bbe9b99c5a24844b65c04fcb44a1b",
+  "matches_independent_sample": true,
+  "issues": [],
+  "elapsed_seconds": 18.45,
+  "notes": "Actual authenticated Codex CLI background run. No database export was initiated by the normalization job."
+}

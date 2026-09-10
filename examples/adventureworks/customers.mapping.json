@@ -1,0 +1,62 @@
+{
+  "metadata": {
+    "contract_version": 1,
+    "mapping_id": "aw_customers",
+    "mapping_version": "1.0.0"
+  },
+  "columns": [
+    {
+      "ordinal": 1,
+      "source": null,
+      "target": "customer_uid",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "keys": [
+            "CustomerID"
+          ],
+          "namespace": "adventureworks/customer",
+          "op": "identity"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 2,
+      "source": "CustomerID",
+      "target": "customer_id",
+      "type": "integer",
+      "nullable": false,
+      "rules": [],
+      "scale": null
+    },
+    {
+      "ordinal": 3,
+      "source": "AccountNumber",
+      "target": "account_reference",
+      "type": "string",
+      "nullable": false,
+      "rules": [
+        {
+          "op": "prefix",
+          "value": "CRM-"
+        },
+        {
+          "op": "suffix",
+          "value": "-ACTIVE"
+        }
+      ],
+      "scale": null
+    },
+    {
+      "ordinal": 4,
+      "source": "TerritoryID",
+      "target": "territory_id",
+      "type": "integer",
+      "nullable": true,
+      "rules": [],
+      "scale": null
+    }
+  ]
+}
