@@ -36,9 +36,10 @@ class JsonlSource:
         self.config, self.mapping = config, mapping
         self.path = Path(config["fixture"])
         self.identity = {"kind": "jsonl", "sha256": file_hash(self.path)}
+        self.required = set(source_columns(mapping)) | {config["date_column"]}
 
     def rows(self, start, end):
-        required = set(source_columns(self.mapping)) | {self.config["date_column"]}
+        required = self.required
         with self.path.open("rb") as stream:
             for number, raw in enumerate(iter(lambda: stream.readline(16 * 1024 * 1024 + 1), b""), 1):
                 require(len(raw) <= 16 * 1024 * 1024, f"Fixture line {number} exceeds 16 MiB")
@@ -96,6 +97,9 @@ class SqlServerSource:
                             "Selected datetime2 columns must have scale <= 6 to avoid Python datetime precision loss; provide an approved staging column")
                 self.identity = {"kind": "sqlserver", "server": identity[0], "database": identity[1],
                                  "schema_sha256": fingerprint([list(r) for r in catalog])}
+                # Fixed for the whole export; the engine compiles column names to these indexes.
+                self.layout = source_columns(mapping)
+                self.sql = select_sql(config, mapping)
                 isolation = "SNAPSHOT" if config["isolation"] == "snapshot" else "READ COMMITTED"
                 cursor.execute("SET TRANSACTION ISOLATION LEVEL " + isolation)
             finally:
@@ -114,14 +118,15 @@ class SqlServerSource:
         cursor.arraysize = self.config["batch_size"]
         try:
             # ODBC parameters are UTC-naive datetime objects. No literals interpolated into SQL.
-            cursor.execute(select_sql(self.config, self.mapping), start.replace(tzinfo=None), end.replace(tzinfo=None))
-            names = [c[0] for c in cursor.description]
+            cursor.execute(self.sql, start.replace(tzinfo=None), end.replace(tzinfo=None))
+            # Positional access is only sound while the driver returns the projection order.
+            require(not self.layout or [c[0] for c in cursor.description] == self.layout,
+                    "SQL projection does not match the compiled mapping layout")
             while True:
                 batch = cursor.fetchmany(self.config["batch_size"])
                 if not batch:
                     break
-                for row in batch:
-                    yield dict(zip(names, row))
+                yield from batch
             if self.config["isolation"] == "snapshot":
                 self.connection.commit()
         except Exception as exc:

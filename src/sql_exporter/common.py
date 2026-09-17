@@ -19,8 +19,13 @@ def identifier(value):
     return value
 
 
+# json.dumps builds a fresh encoder per call; this is the same encoder it would build.
+_ENCODER = json.JSONEncoder(skipkeys=False, ensure_ascii=False, check_circular=True, allow_nan=False,
+                            indent=None, separators=(",", ":"), default=None, sort_keys=True)
+
+
 def canonical(value):
-    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    return _ENCODER.encode(value)
 
 
 def fingerprint(value):

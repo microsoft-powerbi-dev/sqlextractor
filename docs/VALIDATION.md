@@ -1,5 +1,50 @@
 # Validation performed
 
+## Engine 1.2 compiled row pipeline (2026-09-16)
+
+- **174 automated tests passed** on the export path (`pytest --ignore=tests/test_mapping_jobs.py`).
+  Two tests in `tests/test_mapping_jobs.py` fail on this Windows host; they exercise the detached
+  background-worker lifecycle, which 1.1 already recorded as implemented but unverified on Windows.
+  Both failures predate this work and are unrelated to the export path.
+- **Output is byte-identical.** `tests/test_golden_bytes.py` pins the per-window TXT SHA-256, byte
+  count and row count for `examples/demo.json` (36 windows) and a new all-operations corpus
+  (`tests/golden/`, 13 windows, 19 targets covering every op and every target type). Goldens were
+  captured from engine 1.1.0 and still match.
+- **Measured speedup 1.67x** on the AdventureWorks detail mapping (13 targets, 4 identity rules, 1
+  template chain, 3 decimals) over 20,000 synthetic rows: 293.5 to 176.1 microseconds per row,
+  3,406 to 5,678 rows per second. Old and new implementations were timed interleaved in one process
+  over 9 repetitions and the median ratio reported, because this host drifts more than 2x between
+  runs; absolute microsecond figures are not portable. The positional source path measured 174.7
+  microseconds per row (1.68x). Both arms were asserted byte-identical to 1.1.0 output first.
+- Component contributions measured separately: hoisting the identity namespace UUID plus the cached
+  JSON encoder and pinned decimal context, 1.27x; adding the compiled closure pipeline, 1.49x; the
+  bounded identity memo, a further ~1.2x on identity-heavy mappings. Positional row access
+  contributes ~1.05x on the SQL path, not the 5x an isolated row-unpacking microbenchmark suggests,
+  because unpacking is roughly 2 of 190 microseconds per row.
+- Equivalences proved by differential test rather than inspection, and kept as permanent tests in
+  `tests/test_compiled_pipeline.py`: `quantize(context=Context(prec=80))` against the previous
+  per-value `localcontext()` over 399 value/scale cases including `-0`, `1.005`, `-2.5`, 38-digit
+  values and every error path with matching exception types; `Context.multiply` against `*` under
+  `localcontext` over 126 cases; the cached namespace UUID against nested `uuid5` over 3,000 random
+  Unicode namespaces; and the cached `JSONEncoder` against `json.dumps` with the same keyword
+  arguments, which leaves every mapping and run fingerprint unchanged.
+- Memory: the 20,000-row streaming regression test peaks at **0.70 MiB** against its 5 MiB budget.
+  The identity memo is per rule and capped at `IDENTITY_CACHE = 4096` entries, cleared wholesale on
+  overflow; 40,000 rows through a four-identity mapping peak at 3.83 MiB and do not grow.
+- Positional source access is covered by `tests/test_compiled_pipeline.py`, which exports the same
+  fixture through a sequence-yielding source and a mapping source and compares every file hash, and
+  which pins the two hazards: source index 0 is falsy but must still be read, and a missing
+  positional column raises `IndexError` where a mapping raises `KeyError`, so the caught exception
+  group was widened to `LookupError` to keep the "names the target, leaks no value" error contract.
+- **Two deliberate behaviour changes.** `compile_rule` rejects an unknown operation, where the old
+  `apply_rules` interpreter silently passed the value through; validated mappings could never reach
+  that path, so only direct unvalidated calls are affected. Intermediate decimal arithmetic now uses
+  a pinned `Context(prec=80)` instead of copying the ambient context, so an embedding process that
+  changes `decimal.getcontext()` can no longer alter output bytes.
+- No live SQL Server run. The positional path is exercised by mocks and by an equivalent
+  sequence-yielding offline source only; the existing native-driver limitation still applies, and
+  `SqlServerSource` still needs the scratch-database smoke test described in README before real use.
+
 ## Engine 1.1 additions (2026-09-10)
 
 - **115 automated tests passed** on the updated engine, including canonical JSON/XLSX equivalence, multiple deterministic identities, composite key framing, source dependency projection, prefixes/suffixes/templates, real detached external-worker success, invalid output, timeout, cancellation, and unsupported-rule rejection. Unit tests do not call an AI provider or download data.

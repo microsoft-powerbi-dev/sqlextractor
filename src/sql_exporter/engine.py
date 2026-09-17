@@ -10,7 +10,7 @@ from . import __version__
 from .common import ExportError, canonical, file_hash, fingerprint, require, strict_json
 from .config import requested_settings
 from .serialization import record
-from .transforms import transform
+from .transforms import compile_columns
 from .windows import iso, resolve_range, timestamp, window_name, windows
 
 
@@ -107,6 +107,13 @@ def _export_locked(config, mapping, source, output, resume, progress):
             require(data_path.is_file() and data_path.stat().st_size == manifest.get("bytes")
                     and file_hash(data_path) == manifest.get("sha256"), "Completed output failed integrity verification; restore it or start a new directory")
             completed[window["name"]] = manifest
+    # Compile the mapping once per export, not once per row. A source that yields sequences
+    # advertises `layout`; its column names become positional indexes inside the compiled program.
+    columns = mapping["model"]["columns"]
+    layout = getattr(source, "layout", None)
+    compiled = compile_columns(columns, {name: index for index, name in enumerate(layout)} if layout else None)
+    null_token = config["null_token"]
+    header = [c["target"] for c in columns] if config["header"] else None
     written = skipped = total_rows = 0
     for window in plan["windows"]:
         name = window["name"]
@@ -129,15 +136,15 @@ def _export_locked(config, mapping, source, output, resume, progress):
             with private_file(partial) as stream:
                 def write(values):
                     nonlocal byte_count
-                    data = record(values, config["null_token"])
+                    data = record(values, null_token)
                     stream.write(data)
                     digest.update(data)
                     byte_count += len(data)
-                if config["header"]:
-                    write([c["target"] for c in mapping["model"]["columns"]])
+                if header:
+                    write(header)
                 iterator = iter(source.rows(timestamp(window["start"]), timestamp(window["end"])))
                 for row in iterator:
-                    write(transform(row, mapping["model"]["columns"]))
+                    write([run(row) for run in compiled])
                     rows += 1
                 stream.flush()
                 os.fsync(stream.fileno())

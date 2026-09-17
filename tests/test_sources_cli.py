@@ -14,8 +14,13 @@ from sql_exporter.windows import timestamp
 from conftest import ROOT
 
 
+# Mirrors the real projection order that select_sql generates for examples/mapping.xlsx,
+# so the source's positional-layout guard is exercised rather than bypassed.
+LAYOUT = ["OrderId", "CreatedAt", "Customer", "Amount", "Status", "Note"]
+
+
 class Cursor:
-    description = [("OrderId",)]
+    description = [(name,) for name in LAYOUT]
 
     def __init__(self):
         self.calls, self.sizes = [], []
@@ -27,7 +32,8 @@ class Cursor:
 
     def fetchmany(self, size):
         self.sizes.append(size)
-        return [(1,), (2,)] if len(self.sizes) == 1 else []
+        return [(1, "2023-09-05", "a", "1.00", "A", None),
+                (2, "2023-09-06", "b", "2.00", "C", None)] if len(self.sizes) == 1 else []
 
     def close(self):
         self.closed = True
@@ -53,8 +59,11 @@ def test_sql_projection_and_bound_parameters_streaming(config, mapping):
     source = SqlServerSource.__new__(SqlServerSource)
     source.config, source.mapping = config | {"batch_size": 2, "isolation": "snapshot"}, mapping
     source.connection = Connection(cursor)
+    source.layout, source.sql = LAYOUT, select_sql(source.config, mapping)
     rows = list(source.rows(timestamp("2023-09-01"), timestamp("2023-10-01")))
-    assert rows == [{"OrderId": 1}, {"OrderId": 2}]
+    assert rows == [(1, "2023-09-05", "a", "1.00", "A", None),
+                    (2, "2023-09-06", "b", "2.00", "C", None)]
+    assert source.layout == LAYOUT
     sql, start, end = cursor.calls[0]
     assert "WHERE [CreatedAt] >= ? AND [CreatedAt] < ?" in sql
     assert "SELECT *" not in sql and "2023" not in sql
@@ -69,6 +78,7 @@ def test_sql_failure_closes_cursor_and_rolls_back(config, mapping):
     source = SqlServerSource.__new__(SqlServerSource)
     source.config, source.mapping = config | {"isolation": "snapshot"}, mapping
     source.connection = Connection(cursor)
+    source.layout, source.sql = LAYOUT, select_sql(source.config, mapping)
     with pytest.raises(ExportError) as caught:
         list(source.rows(timestamp("2023-09-01"), timestamp("2023-10-01")))
     assert "credentials" not in str(caught.value)

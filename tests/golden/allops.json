@@ -1,0 +1,15 @@
+{
+  "config_version": 1,
+  "source": "jsonl",
+  "source_id": "golden_allops",
+  "schema": "dbo",
+  "table": "AllOps",
+  "date_column": "SDate",
+  "mapping": "allops.mapping.json",
+  "fixture": "allops.jsonl",
+  "output_dir": "IGNORED_SET_BY_TEST",
+  "start": "2023-09-01T00:00:00Z",
+  "end": "2026-09-01T00:00:00Z",
+  "granularity": "quarter",
+  "order_by": []
+}

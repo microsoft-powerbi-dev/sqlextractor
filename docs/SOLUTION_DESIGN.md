@@ -34,7 +34,7 @@ flowchart LR
 | --- | --- |
 | `config.py` | Strict config parsing, defaults, identifiers, relative path resolution. |
 | `mapping.py` | Workbook loading, formula rejection, contract validation and semantic fingerprint. |
-| `transforms.py` | Validated operation vocabulary, null handling, exact conversion and formatting. |
+| `transforms.py` | Validated operation vocabulary, null handling, exact conversion and formatting, and the compile-once rule pipeline. |
 | `windows.py` | UTC normalization, calendar-year subtraction, clipped nonoverlapping windows. |
 | `sources.py` | Explicit-column parameterized SQL, metadata checks, fetchmany iteration; offline JSONL fixture adapter. |
 | `serialization.py` | UTF-8 pipe CSV dialect, lossless quoted delimiters/newlines, null collision rejection. |
@@ -65,6 +65,8 @@ The workbook has contract_version, mapping_id, mapping_version, and ordered outp
 Canonical sorted JSON of the normalized model produces a SHA-256 fingerprint. Formatting changes do not alter it; semantic changes do, even without a mapping-version bump. Run metadata stores the model and original workbook byte hash for audit. Supported metadata edits require a new workbook/config and output directory, with no engine code changes. Adding a new operation requires implementation and tests; the design intentionally does not pretend arbitrary business prose is executable.
 
 ## Streaming and performance
+
+The mapping is compiled once per export into one closure per target column, with rule-determined constants resolved up front: identity namespace UUIDs, parsed template fields, decimal factors and quantizers, lookup tables, nullability, and source keys. `transform` and `apply_rules` remain as shims over the same compiler, so no second implementation can drift from it. A source that yields sequences rather than mappings advertises a `layout`, and the compiler binds column names to positional indexes; the source verifies the driver's reported description still matches that layout before the first row of each window. Identity results are memoized per rule within a bounded cache, because a foreign-key identity recurs across many rows and its derivation is a pure function of the key values.
 
 Each window executes one SELECT projecting only unique mapped source columns. `fetchmany(batch_size)` retrieves up to 5,000 rows by default. Each row is transformed, serialized, written, and included in a streaming SHA-256. The engine never accumulates a table or a whole window. Memory is proportional to a bounded number of rows times their width, plus the small workbook and window plan; it is not a fixed byte ceiling for arbitrarily large SQL LOB fields. pyodbc documents both parameter binding and bounded batch retrieval in its [cursor API](https://github.com/mkleehammer/pyodbc/wiki/Cursor).
 
