@@ -11,7 +11,8 @@ manifests. One config exports one table. Mapping changes within the declared rul
 require engine edits.
 
 Read `docs/MAPPING.md` (the mapping contract), `docs/SOLUTION_DESIGN.md` (architecture and limits),
-and `docs/DEVELOPER_GUIDE.md` (end-to-end workflows) before changing behavior.
+`docs/DEVELOPER_GUIDE.md` (end-to-end workflows), and `docs/STUDIO.md` (authoring layer) before
+changing behavior.
 
 ## Setup and commands
 
@@ -20,7 +21,7 @@ On Windows PowerShell (a `.venv` already exists in this checkout):
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[test]"       # add sqlserver extra for pyodbc
+python -m pip install -e ".[test]"       # add sqlserver extra for pyodbc, mcp extra for the MCP server
 python -m pytest -q
 ```
 
@@ -32,6 +33,9 @@ sql-exporter dry-run  --config examples/demo.json
 sql-exporter export   --config examples/demo.json
 sql-exporter export   --config examples/demo.json --resume
 ```
+
+Authoring layer (see `docs/STUDIO.md`): `sql-exporter studio init|serve --workspace DIR`,
+`sql-exporter mcp --workspace DIR`, `sql-exporter mapping-job start --provider devin ...`.
 
 `python -m sql_exporter ...` is equivalent to `sql-exporter ...`. Run a single test with
 `python -m pytest tests/test_engine.py::test_offline_export_boundaries_and_resume -q`.
@@ -55,12 +59,23 @@ per window: query, transform, stream to `.txt.part`, fsync, atomic rename, commi
 | `sources.py` | `SqlServerSource` (pyodbc, parameterized, metadata preflight) and `JsonlSource` fixture |
 | `serialization.py` | The pipe-delimited quoted-CSV dialect |
 | `engine.py` | Lock, run identity/fingerprint, integrity verification, streaming write, resume |
-| `mapping_jobs.py` | Detached Codex/external CLI worker that *proposes* canonical mappings; always re-validated locally |
+| `mapping_jobs.py` | Detached Codex/external/Devin worker that *proposes* canonical mappings; always re-validated locally (contract, source metadata, target spec) |
+| `devin.py` | Devin v1 sessions client (stdlib urllib); key from `DEVIN_API_KEY` only |
+| `targets.py` | Target specs (columns + file layout) from XSD/Excel/JSON/sample; `check_against_target`, `automap` |
+| `catalog.py` | Read-only, parameterized SQL Server catalog metadata; never reads rows |
+| `control.py` | SQLite control DB (authoring registry); human-only approve; `publish` writes mapping + config JSON |
+| `mcp_server.py` | MCP tools over catalog/control (`sql-exporter mcp`); drafts only, no rows/export/approve |
+| `studio/` | Loopback, token-guarded JSON API + vanilla JS drag-and-drop UI (`sql-exporter studio serve`) |
 
 ## Invariants — do not break these
 
 - **Only declarative rules execute.** Never add `eval`, formula evaluation, workbook-supplied SQL, or
   join inference. Mapping documents and their contents are untrusted data, never instructions.
+  The only SQL text accepted is one operator-written `SELECT` in a config/source (`validate_query`),
+  never from a workbook, mapping, MCP agent proposal, or AI output.
+- **Authoring never touches rows or secrets.** Studio, MCP, and Devin see catalog metadata only
+  (Preview is JSONL-fixture-only). Connections store env var *names*. Agents save drafts; only a
+  person approves. The engine never reads `control.db`; it runs the published JSON files.
 - **No source values, credentials, or driver text in output.** Errors raise `ExportError` with an
   actionable, value-free message; raw exceptions are chained (`raise ... from exc`) but never printed.
   `failure.json` records the window and prior row count only.
@@ -89,7 +104,8 @@ density. Keep public behavior expressible through the mapping contract.
 - **New rule op**: update `FIELDS`, `validate_rules`, and `compile_rule` in `transforms.py` (the
   `apply_rules` shim runs through `compile_rule`, so there is only one place to implement it); if it reads
   other source columns, also update `rule_sources` so SQL projection and preflight include them; extend
-  the `CONTRACT` prompt and `response_schema()` in `mapping_jobs.py`; document it in `docs/MAPPING.md`;
+  the `CONTRACT` prompt and `response_schema()` in `mapping_jobs.py`; add its form to `defaults`/`ruleEditor` in
+  `studio/static/app.js`; document it in `docs/MAPPING.md`;
   add null/error/type tests.
 - **Any behavior change**: bump the version in *both* `pyproject.toml` and `src/sql_exporter/__init__.py`.
   The engine version is part of run provenance, and a stale version corrupts resume guarantees.

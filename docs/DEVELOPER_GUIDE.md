@@ -8,7 +8,7 @@ Clone your copy of the repository or extract the delivered source ZIP and enter 
 
 Install Python 3.10+ and VS Code. Python 3.12.14 was used for the recorded validation. Python dependencies install from PyPI; do not copy a `.venv` from another machine. No Node.js, Codex, or SQL Server installation is needed for offline exports and tests. The sample Excel workbooks are already supplied.
 
-For optional AI normalization, install a supported Node.js runtime and Codex CLI using [OpenAI's CLI installation instructions](https://developers.openai.com/codex/cli). A Devin integration uses the external adapter contract in step 9; no native Devin CLI installation was found or tested on the development machine.
+For optional AI normalization, either set `DEVIN_API_KEY` for the native Devin provider (step 9), or install a supported Node.js runtime and Codex CLI using [OpenAI's CLI installation instructions](https://developers.openai.com/codex/cli). Mapping Studio and the MCP server are covered in [STUDIO.md](STUDIO.md).
 
 ## 2. Create an isolated Python environment
 
@@ -46,7 +46,7 @@ The supplied `.vscode/settings.json` configures pytest discovery. The Run and De
 python -m pytest -q
 ```
 
-The current suite includes calendar boundaries, serialization, decimal conversions, mapping validation, identity/reference rules, source projection, partial-file recovery, resume integrity, and detached background-worker success/failure/cancel/timeout tests. Test workers use a local fake external provider; tests do not call Codex, Devin, a database, or the network. The larger AdventureWorks downloads/exports are a separate integration example, not part of the quick unit suite.
+The current suite includes calendar boundaries, serialization, decimal conversions, mapping validation, identity/reference rules, source projection, partial-file recovery, resume integrity, and detached background-worker success/failure/cancel/timeout tests. Test workers use a local fake external provider; tests do not call Codex, Devin, a database, or the network (the Devin tests use a local fake API server and the Studio tests use a loopback server). The larger AdventureWorks downloads/exports are a separate integration example, not part of the quick unit suite.
 
 ## 5. Run the small offline example
 
@@ -173,20 +173,41 @@ sql-exporter dry-run --config examples/adventureworks/reviewed-orders.json
 sql-exporter export --config examples/adventureworks/reviewed-orders.json
 ```
 
-## 9. Connect another CLI, including a Devin wrapper
+## 9. Generate mappings with Devin, or connect another CLI
 
-There is a native Codex adapter and a generic **external** adapter. A native Devin command syntax is not assumed, and no Devin integration was run. To integrate your organization's installed Devin CLI, write a small wrapper around its documented noninteractive interface that:
+**Devin (native).** Engine 1.3 talks to the Devin v1 sessions API directly:
 
-1. Reads the supplied prompt from stdin.
-2. Passes it to the approved CLI/provider.
-3. Waits for completion.
-4. Prints only one JSON object to stdout with root `mappings` and `issues`. Column `rules_json` is a JSON array encoded as text; consult the generated response.schema.json or `response_schema()` in mapping_jobs.py.
-5. Writes diagnostics to stderr and exits nonzero on failure. It must own cleanup for any remote job or subprocess it creates.
+```sh
+export DEVIN_API_KEY=...            # PowerShell: $env:DEVIN_API_KEY = '...'
+sql-exporter describe --connection-env SQL_EXPORTER_CONNECTION_STRING --table dbo.Orders > orders.columns.json
+sql-exporter mapping-job start --provider devin --input general-mapping.md \
+  --source-metadata orders.columns.json --target-spec examples/targets/orders.xsd --timeout 1800
+```
+
+How the job runs:
+- The worker creates a session, records `session_id` and `session_url` in `status.json`, and polls
+  `GET /v1/sessions/{id}` until Devin's structured output holds `{mappings, issues}`.
+- The result passes the same local validation as Codex output. It must also use only the listed
+  source columns and match the target spec.
+- Cancel and timeout terminate the session. The API key stays in the environment and never
+  reaches the job folder.
+- Tests run the detached worker against a local fake of the API. A live Devin session has not
+  been validated from this repository yet.
+
+Mapping Studio wraps the same flow in **Generate with Devin**; see [STUDIO.md](STUDIO.md).
+
+**Other CLIs.** The generic **external** adapter runs any approved CLI wrapper. The wrapper must:
+
+1. Read the supplied prompt from stdin.
+2. Pass it to the approved CLI/provider.
+3. Wait for completion.
+4. Print only one JSON object to stdout with root `mappings` and `issues`. Column `rules_json` is a JSON array encoded as text; consult the generated response.schema.json or `response_schema()` in mapping_jobs.py.
+5. Write diagnostics to stderr and exit nonzero on failure. It must own cleanup for any remote job or subprocess it creates.
 
 Put an argument array in a local JSON file, for example:
 
 ```json
-["/absolute/path/to/python", "/absolute/path/to/devin_mapping_wrapper.py"]
+["/absolute/path/to/python", "/absolute/path/to/my_mapping_wrapper.py"]
 ```
 
 Then run:
@@ -195,7 +216,10 @@ Then run:
 sql-exporter mapping-job start --provider external --command-file local-provider.json --input general-mapping.md
 ```
 
-Arguments are passed with `shell=False`; shell strings, redirects, pipes, and command substitution are not interpreted. Use absolute wrapper paths because the provider working directory is the job's work folder. Authentication, remote cancellation, and provider-specific flags belong to the wrapper. The repository tests cover this external stdin/stdout contract with a real detached local subprocess.
+Arguments are passed with `shell=False`; shell strings, redirects, pipes, and command substitution are not interpreted. Use absolute wrapper paths because the provider working directory is the job's work folder. The repository tests cover this external stdin/stdout contract with a real detached local subprocess.
+
+**MCP.** `sql-exporter mcp --workspace DIR` gives MCP clients such as Claude Code and VS Code read-only SQL metadata
+and draft-only mapping tools; see [STUDIO.md](STUDIO.md#3-sql-mcp-server).
 
 ## 10. Set up SQL Server in a new environment
 

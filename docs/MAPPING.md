@@ -88,3 +88,18 @@ Validation checks rule structure and parameters before connection. Whether a sou
 Both `.xlsx` (openpyxl) and binary `.xls` (xlrd) normalize to the same contract. The XLS reader also scans BIFF formula records because xlrd otherwise exposes formula caches. XLSX formulas/error cells are rejected even if they have cached values. Limits: 10 MiB workbook file, 50 MiB expanded XLSX, 4,096 rows and 32 columns per sheet, 1–1,024 mapped targets. Styles and physical row order are excluded from the semantic hash; every metadata field and normalized column definition is included.
 
 Review a mapping diff by comparing the normalized `mapping` object in run manifests, and keep mapping workbooks/configs under version control. Adding, renaming, reordering, casting, defaulting, and supported rule/lookup changes need only a workbook update and a new output directory. Joins, cross-row calculations, arbitrary expressions, and new operations require a deliberate implementation extension and engine/contract version decision; there is no `eval` escape hatch.
+
+## Source queries and target layouts (engine 1.3)
+
+The mapping contract above does not change. Two related inputs sit beside it:
+
+- **Source query.** A config may name one read-only `SELECT` (`query` or `query_file`) instead of
+  `schema`/`table`. Mapping `source` names refer to the query's output column names. SQL never
+  comes from a workbook, a mapping, or AI output.
+- **Target spec.** A target spec lists the required output columns (name, order, type,
+  nullability, scale) and the file layout (pattern, extension, delimiter, header, line ending,
+  encoding, null token). It can be imported from an XSD, an Excel `Target` sheet, a JSON spec, or
+  a sample file. A mapping fits a spec when it has the same column names in the same order, the
+  same types and scales, and no nullable column where the spec requires a value.
+  `targets.check_against_target` reports every difference. Studio and the Devin provider enforce
+  this before approval. See [STUDIO.md](STUDIO.md).

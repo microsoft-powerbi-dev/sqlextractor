@@ -2,6 +2,16 @@
 
 A working Python CLI that reads a versioned Excel mapping, streams SQL Server table data for the last three calendar years, and writes pipe-delimited `.txt` files for calendar time windows. Monthly windows are the default. Mapping changes within the documented rule contract require no engine edits.
 
+**New in 1.3:** [Mapping Studio, SQL MCP server, and Devin mapping generation](docs/STUDIO.md).
+- A localhost drag-and-drop mapping UI (`sql-exporter studio serve`), backed by a SQLite control database of sources, targets, mapping versions, and lineage.
+- Target layouts imported from XSD, Excel, or a sample file.
+- An MCP server for SQL Server metadata (`sql-exporter mcp`).
+- `mapping-job --provider devin`, which generates mappings through the Devin API.
+- Config-only `SELECT` query sources.
+- Configurable file name pattern, extension, delimiter, line ending, and BOM.
+
+The defaults reproduce 1.2 output bytes exactly. Use a new output directory after upgrading.
+
 **New in 1.1:** [step-by-step developer setup](docs/DEVELOPER_GUIDE.md), [large related AdventureWorks example](examples/adventureworks/README.md), deterministic generated identities, prefix/suffix/template rules, canonical JSON mappings, and detached Codex/external CLI normalization jobs. Existing 1.0 export directories remain intact; use a new output directory after this engine upgrade.
 
 The repository includes a synthetic, repeatable offline demo. No database connection or production extraction was performed during development. The SQL adapter has mocked tests; a real SQL Server smoke test is still required. On the development Mac, the pyodbc package installed but its system unixODBC library was absent.
@@ -34,12 +44,19 @@ Files to start with:
 - `examples/sqlserver.json`: SQL Server configuration template; no credentials.
 - `docs/SOLUTION_DESIGN.md`: architecture, performance, consistency, recovery, and extensions.
 - `docs/MAPPING.md`: exact workbook and transformation contract.
+- `docs/STUDIO.md`: Mapping Studio, control database, MCP server, and Devin generation.
+- `examples/targets/orders.xsd`: a target layout matching the sample mapping; `examples/sqlserver_query.json` uses a SELECT source and a CSV layout.
 - `examples/sqlserver_demo.sql`: optional scratch-database setup, to execute manually.
 
 ## CLI workflows
 
 | Command | Behavior |
 | --- | --- |
+| `studio init --workspace DIR` / `studio serve --workspace DIR` | Create the control database, then open the drag-and-drop Mapping Studio on 127.0.0.1. See [STUDIO.md](docs/STUDIO.md). |
+| `mcp --workspace DIR [--transport http]` | SQL metadata and mapping-authoring tools over MCP (stdio, or token-guarded HTTP). |
+| `describe --connection-env VAR --table schema.table` | Print column metadata (also `--query-file`, `--fixture`). Reads the catalog only. |
+| `target-spec --input FILE` | Normalize an `.xsd`, Excel `Target` sheet, JSON spec, or sample file into a target spec. |
+| `mapping-job start --provider devin ...` | Generate a mapping with Devin from a document, source metadata, and a target spec. |
 | `validate --config FILE` | Validate config and workbook offline. Does not inspect source rows. |
 | `validate --config FILE --connect` | Also open the source and inspect SQL table metadata/server identity, or hash the JSONL fixture. Does not extract data or create output files. |
 | `dry-run --config FILE` | Show the exact planned windows, generated parameterized SQL, output path, and mapping fingerprint. No connection or output writes. |
@@ -70,7 +87,8 @@ Config JSON rejects unknown or duplicate keys. Relative paths resolve against th
 | `config_version` | Default `1`; only version 1 supported. |
 | `source` | Required: `sqlserver` or `jsonl`. |
 | `source_id` | Required logical dataset identifier. |
-| `schema`, `table`, `date_column` | Required source identifiers. Sample assumes `dbo.Orders.CreatedAt`; there is no automatic date-column inference. |
+| `schema`, `table`, `date_column` | Source identifiers. `date_column` is always required; `schema` and `table` are required unless `query` is used. Sample assumes `dbo.Orders.CreatedAt`; there is no automatic date-column inference. Views are accepted. |
+| `query` or `query_file` | SQL only, instead of `schema`/`table`. One read-only `SELECT` (joins and filters allowed). It is wrapped as a derived table and the window filter applies outside it. Rejected: `;`, comments, `INTO`, `EXEC`, DML, DDL, variables, system procedures, and a top-level `ORDER BY`. Metadata comes from `sys.dm_exec_describe_first_result_set` without running the query. Use a read-only login. |
 | `mapping`, `output_dir` | Required paths. Mapping is `.xlsx` or `.xls`. |
 | `connection_env` | SQL only; defaults to `SQL_EXPORTER_CONNECTION_STRING`. |
 | `fixture` | JSONL only, required path. Fixture rows must contain all selected columns and date_column. |
@@ -80,7 +98,12 @@ Config JSON rejects unknown or duplicate keys. Relative paths resolve against th
 | `granularity` | `day`, `month` (default), `quarter`, `year`; calendar-aligned UTC boundaries. |
 | `batch_size` | Default 5,000, allowed 1–100,000 rows. |
 | `header` | Default `true`; header names come from ordered mapping targets. |
-| `null_token` | Default `\N`; 1–32 characters, no pipe/quote/CR/LF. Any identical non-null field or header causes failure. |
+| `null_token` | Default `\N`; 1–32 characters, no delimiter/quote/CR/LF. Any identical non-null field or header causes failure. |
+| `delimiter` | Default `\|`; any single character except quote, CR, or LF (for example `,` or tab). |
+| `line_ending` | Default LF (`"\n"`); or CRLF (`"\r\n"`). |
+| `encoding` | Default `utf-8`; `utf-8-sig` writes a BOM at the start of each file (counted in its hash). |
+| `file_pattern` | Default `null`, which gives `<start>_<end>` timestamps. Placeholders: `{mapping_id}`, `{source_id}`, `{start:FORMAT}`, `{end:FORMAT}`, with `%Y %m %d %H %M %S %f %j`. Must include `{start}` and give every window a unique name, for example `{mapping_id}_{start:%Y%m}` for monthly windows. |
+| `file_extension` | Default `.txt`; for example `.csv` or `.dat`. Manifests stay `<name>.json`. |
 | `timezone` | Default and only supported value `UTC`. Naive input timestamps are interpreted as UTC. |
 | `order_by` | Default `[]`; optional source columns, ascending. Use a unique combination for reproducible ordering. JSONL preserves fixture order and does not sort. |
 | `isolation` | SQL: `read_committed` (default), or `snapshot` per window. JSONL accepts only `read_committed`. |
@@ -90,7 +113,7 @@ For rolling exports, a month-aligned end produces 36 monthly files. An end in th
 
 ## TXT format
 
-UTF-8 without BOM, pipe delimiter, LF record terminator, double-quote escaping. Fields containing pipe, quote, CR, or LF are enclosed in double quotes; embedded quotes double. Embedded CR/LF and Unicode are preserved. Empty strings are `""`; null is the configured unquoted token. A non-null value equal to the null token is rejected so readers can distinguish null and empty text without custom quote tracking.
+By default: UTF-8 without BOM, pipe delimiter, LF record terminator, double-quote escaping. The delimiter, terminator, BOM, file names, and extension are configurable as described above. Fields containing the delimiter, quote, CR, or LF are enclosed in double quotes; embedded quotes double. Embedded CR/LF and Unicode are preserved. Empty strings are `""`; null is the configured unquoted token. A non-null value equal to the null token is rejected so readers can distinguish null and empty text without custom quote tracking.
 
 Files are CSV-style TXT, so a record can occupy multiple physical lines. Use a delimiter-aware parser; splitting on `|` or counting physical lines is incorrect. Decimal output uses a decimal point, fixed configured scale, no thousands separators, and `ROUND_HALF_UP`. Integer output is exact signed 64-bit text. Dates use `YYYY-MM-DD`; datetime output uses UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ`; booleans are lowercase `true`/`false`. No locale-dependent formatting is used.
 

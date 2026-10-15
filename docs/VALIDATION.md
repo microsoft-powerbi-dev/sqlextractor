@@ -1,5 +1,43 @@
 # Validation performed
 
+## Engine 1.3 authoring layer (2026-10-15)
+
+Run on Linux with Python 3.13.16, MCP SDK 2.3.0, and Chromium (Playwright 1.56.1).
+
+- **246 automated tests passed** (`python -m pytest -q`). That is 184 existing tests plus 62 new
+  ones covering query sources, output formats, target specs, the control DB, the Devin provider,
+  MCP tools, and the Studio API.
+- **Output stays byte-identical by default.** `tests/test_golden_bytes.py` passes unchanged for the
+  demo and all-operations corpora.
+- **Query sources.** Validator accept/reject cases, derived-table SQL, and a mocked
+  `sys.dm_exec_describe_first_result_set` preflight. No live SQL Server was used.
+- **Output format.** A comma/CRLF/BOM export with `{mapping_id}_{start:%Y%m}.csv` names produced
+  36 files with matching manifest byte counts, and resume skipped all 36.
+- **Devin provider.** A real detached worker ran against a local fake of the v1 sessions API:
+  - success, rejection of an unknown source column, expiry, timeout with session termination,
+    and cancel;
+  - the API key was absent from every job file.
+
+  **No live Devin session was run.** Endpoint and field names follow Devin's published v1 docs
+  (`POST /v1/sessions`, `GET /v1/sessions/{id}` with `status_enum`/`structured_output`,
+  `DELETE /v1/sessions/{id}`) and must be confirmed with a real key.
+- **MCP server.**
+  - 18 tools registered with MCP SDK 2.3.0.
+  - A real stdio client round trip (`list_tools`, `call_tool`) worked, and a path outside the
+    workspace was refused with a value-free tool error.
+  - Streamable HTTP returned 401 without the bearer token and completed `initialize` with it.
+  - The SQL metadata tools used mocked pyodbc only.
+- **Mapping Studio in Chromium (Playwright), on the demo fixture and `examples/targets/orders.xsd`:**
+  - auto-map, then drag `Note` onto `customer` and back;
+  - added the default/trim/upper, lookup, and constant rules through the inspector;
+  - validated (no issues), saved the draft, approved and published, previewed, and checked a
+    390 px phone viewport.
+  - The mapping built in the UI has **the same fingerprint as `examples/mapping.xlsx`**
+    (`6c6cc237...`). Its published config exported 36 files and 5 rows with the CLI, and resume
+    skipped 36.
+- Not validated: a live on-prem SQL Server, a live Devin session, the MCP SDK 1.x code path (the
+  code supports both `FastMCP` and `MCPServer`), and Windows.
+
 ## Engine 1.2 compiled row pipeline (2026-09-16)
 
 - **174 automated tests passed** on the export path (`pytest --ignore=tests/test_mapping_jobs.py`).

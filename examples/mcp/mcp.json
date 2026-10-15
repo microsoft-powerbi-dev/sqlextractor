@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sql-exporter": {
+      "command": "sql-exporter",
+      "args": ["mcp", "--workspace", "/absolute/path/to/mapping-workspace"],
+      "env": {
+        "WAREHOUSE_ODBC": "Driver={ODBC Driver 18 for SQL Server};Server=SQLHOST;Database=Sales;Trusted_Connection=yes;Encrypt=yes"
+      }
+    }
+  }
+}

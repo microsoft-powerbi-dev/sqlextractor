@@ -1,5 +1,17 @@
 # SQL Exporter solution design
 
+Engine 1.3 adds an **authoring layer** in front of the unchanged export path ([STUDIO.md](STUDIO.md)):
+- a SQLite control database (`control.py`);
+- target specs imported from XSD, Excel, or a sample file (`targets.py`);
+- read-only catalog metadata (`catalog.py`) and an MCP server over it (`mcp_server.py`);
+- a Devin API provider for proposals (`devin.py`, `mapping_jobs.py`);
+- a localhost drag-and-drop UI (`studio/`).
+
+Approval publishes ordinary mapping and config JSON files, so run provenance, immutability, and
+resume are exactly as described below. The engine also gains config-only `SELECT` sources, wrapped
+as a derived table with the window predicate outside, and configurable file names and delimited
+dialects. The defaults are byte-identical to 1.2.
+
 Engine 1.1 adds a shared canonical JSON/Excel mapping layer, deterministic related UUID identities, source-field templates, explicit text conversion, prefix/suffix operations, and a detached Codex/external normalization worker. `DEVELOPER_GUIDE.md` documents the new environment setup and workflow. General document interpretation happens before export; validated declarative rules remain the only executable mapping language. The AdventureWorks example demonstrates 120,029 detail rows with linked order/customer/product files and pinned source provenance.
 
 ## Scope and result
@@ -40,6 +52,12 @@ flowchart LR
 | `serialization.py` | UTF-8 pipe CSV dialect, lossless quoted delimiters/newlines, null collision rejection. |
 | `engine.py` | Exclusive lock, frozen run identity, integrity checks, streaming write, atomic publication and resume. |
 | `cli.py` | Workflows, JSON results, progress/error handling and exit codes. |
+| `targets.py` | Target spec normalization; XSD (defusedxml), Excel, and sample importers; mapping-to-target checks; auto-map. |
+| `catalog.py` | Fixed, parameterized SQL Server catalog reads (tables, columns, query result shape). Never reads rows. |
+| `control.py` | SQLite registry of connections (env var names only), sources, targets, mapping versions, lineage, jobs, exports, and audit. Human-only approval, then publishing. |
+| `devin.py` | Devin v1 sessions client (create, poll, terminate) using the standard library. |
+| `mcp_server.py` | MCP tools over `catalog` and `control`: metadata, validation, drafts, dry run. No row, export, or approve tools. |
+| `studio/` | Loopback-only, token-guarded JSON API plus a no-build JavaScript canvas for drag-and-drop mapping. |
 
 ## Time boundaries
 

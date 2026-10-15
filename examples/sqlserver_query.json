@@ -1,0 +1,17 @@
+{
+  "config_version": 1,
+  "source": "sqlserver",
+  "source_id": "orders_with_customer",
+  "query_file": "orders_query.sql",
+  "date_column": "CreatedAt",
+  "mapping": "mapping.xlsx",
+  "output_dir": "../exports/orders_query",
+  "connection_env": "SQL_EXPORTER_CONNECTION_STRING",
+  "years": 3,
+  "granularity": "month",
+  "order_by": ["CreatedAt", "OrderId"],
+  "file_pattern": "{mapping_id}_{start:%Y%m}",
+  "file_extension": ".csv",
+  "delimiter": ",",
+  "line_ending": "\r\n"
+}
