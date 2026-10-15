@@ -20,13 +20,39 @@ def source_columns(mapping):
     return list(dict.fromkeys(names))
 
 
+def relation(config):
+    if "query" in config:
+        # The operator's SELECT is a derived table; the window filter always applies outside it.
+        return "(" + config["query"] + ") AS [__source]"
+    return quote(config["schema"]) + "." + quote(config["table"])
+
+
 def select_sql(config, mapping):
     names = source_columns(mapping)
     projection = ", ".join(map(quote, names)) if names else "1 AS [__constant]"
-    table = quote(config["schema"]) + "." + quote(config["table"])
+    table = relation(config)
     date = quote(config["date_column"])
     order = ", ".join(map(quote, config["order_by"]))
     return f"SELECT {projection} FROM {table} WHERE {date} >= ? AND {date} < ?" + (f" ORDER BY {order}" if order else "")
+
+
+TABLE_COLUMNS = ("SELECT c.name, TYPE_NAME(c.system_type_id), c.max_length, c.precision, c.scale, c.is_nullable "
+                 "FROM sys.columns c JOIN sys.objects t ON t.object_id = c.object_id AND t.type IN ('U', 'V') "
+                 "JOIN sys.schemas s ON s.schema_id = t.schema_id "
+                 "WHERE s.name = ? AND t.name = ? ORDER BY c.column_id")
+# Describes the result set without executing the statement; the text is a bound parameter.
+QUERY_COLUMNS = ("SELECT name, TYPE_NAME(system_type_id), max_length, precision, scale, is_nullable "
+                 "FROM sys.dm_exec_describe_first_result_set(?, NULL, 0) WHERE is_hidden = 0 ORDER BY column_ordinal")
+
+
+def describe(cursor, config):
+    """Catalog rows: (name, type, max_length, precision, scale, is_nullable)."""
+    if "query" in config:
+        rows = cursor.execute(QUERY_COLUMNS, "SELECT * FROM " + relation(config)).fetchall()
+        require(all(r[0] for r in rows), "Every query column needs a name; alias computed expressions")
+        require(len({r[0] for r in rows}) == len(rows), "Query returns duplicate column names; alias them")
+        return rows
+    return cursor.execute(TABLE_COLUMNS, config["schema"], config["table"]).fetchall()
 
 
 class JsonlSource:
@@ -78,12 +104,7 @@ class SqlServerSource:
             cursor = self.connection.cursor()
             try:
                 identity = cursor.execute("SELECT CAST(SERVERPROPERTY('ServerName') AS nvarchar(128)), DB_NAME()").fetchone()
-                catalog = cursor.execute(
-                    "SELECT c.name, TYPE_NAME(c.system_type_id), c.max_length, c.precision, c.scale, c.is_nullable "
-                    "FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id "
-                    "JOIN sys.schemas s ON s.schema_id = t.schema_id "
-                    "WHERE s.name = ? AND t.name = ? ORDER BY c.column_id",
-                    config["schema"], config["table"]).fetchall()
+                catalog = describe(cursor, config)
                 columns = {r[0]: r[1] for r in catalog}
                 required = set(source_columns(mapping)) | {config["date_column"]} | set(config["order_by"])
                 require(required <= set(columns), "SQL table is missing required columns (or metadata is not visible); column names are case-sensitive in this contract")
@@ -97,6 +118,8 @@ class SqlServerSource:
                             "Selected datetime2 columns must have scale <= 6 to avoid Python datetime precision loss; provide an approved staging column")
                 self.identity = {"kind": "sqlserver", "server": identity[0], "database": identity[1],
                                  "schema_sha256": fingerprint([list(r) for r in catalog])}
+                if "query" in config:
+                    self.identity["query_sha256"] = fingerprint(config["query"])
                 # Fixed for the whole export; the engine compiles column names to these indexes.
                 self.layout = source_columns(mapping)
                 self.sql = select_sql(config, mapping)

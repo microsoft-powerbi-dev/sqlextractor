@@ -61,5 +61,18 @@ def windows(start, end, granularity="month"):
         current = stop
 
 
-def window_name(start, end):
-    return start.strftime("%Y%m%dT%H%M%S%fZ") + "_" + end.strftime("%Y%m%dT%H%M%S%fZ")
+STAMP = "%Y%m%dT%H%M%S%fZ"
+
+
+def window_name(start, end, pattern=None, fields=None):
+    if pattern is None:
+        return start.strftime(STAMP) + "_" + end.strftime(STAMP)
+    from string import Formatter
+    parts = []
+    for literal, name, spec, _ in Formatter().parse(pattern):
+        parts.append(literal)
+        if name in {"start", "end"}:
+            parts.append((start if name == "start" else end).strftime(spec or STAMP))
+        elif name is not None:
+            parts.append(fields[name])
+    return "".join(parts)

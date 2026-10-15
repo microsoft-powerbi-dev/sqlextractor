@@ -1,6 +1,7 @@
 import hashlib
 import os
 import platform
+import re
 from importlib.metadata import version
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from .config import requested_settings
 from .serialization import record
 from .transforms import compile_columns
 from .windows import iso, resolve_range, timestamp, window_name, windows
+
+BOM = b"\xef\xbb\xbf"
 
 
 def sync_directory(path):
@@ -54,8 +57,14 @@ def make_plan(config, mapping, saved=None):
         start, end = resolve_range(config["start"], config["end"], config["years"])
     intervals = list(windows(start, end, config["granularity"]))
     require(len(intervals) <= 40000, "Too many windows")
-    return {"start": iso(start), "end": iso(end), "windows": [
-        {"name": window_name(a, b), "start": iso(a), "end": iso(b)} for a, b in intervals]}
+    fields = {"mapping_id": mapping["model"]["metadata"]["mapping_id"], "source_id": config["source_id"]}
+    plan = [{"name": window_name(a, b, config["file_pattern"], fields), "start": iso(a), "end": iso(b)} for a, b in intervals]
+    names = [w["name"] for w in plan]
+    require(all(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,199}", n) and n.lower() not in {"run", "failure"} for n in names),
+            "file_pattern produces an invalid file name")
+    # Names are compared case-insensitively because Windows and macOS file systems usually are.
+    require(len({n.lower() for n in names}) == len(names), "file_pattern must produce a unique name per window; include {start} at the window granularity")
+    return {"start": iso(start), "end": iso(end), "windows": plan}
 
 
 def export(config, mapping, source, resume=False, progress=None):
@@ -90,9 +99,10 @@ def _export_locked(config, mapping, source, output, resume, progress):
         run = base | {"plan": plan, "mapping": mapping["model"], "workbook_sha256": mapping["workbook_sha256"]}
         run["run_fingerprint"] = fingerprint(run)
         atomic_json(run_path, run)
+    extension = config["file_extension"]
     expected = {"run.json", ".export.lock", "failure.json", "failure.json.part"}
     for window in plan["windows"]:
-        expected.update(window["name"] + suffix for suffix in (".txt", ".txt.part", ".json", ".json.part"))
+        expected.update(window["name"] + suffix for suffix in (extension, extension + ".part", ".json", ".json.part"))
     require(all(p.name in expected and not p.is_symlink() for p in output.iterdir()), "Output directory contains unexpected files or symlinks")
     completed = {}
     # Verify all completed windows before writing any new data.
@@ -100,7 +110,7 @@ def _export_locked(config, mapping, source, output, resume, progress):
         manifest_path = output / (window["name"] + ".json")
         if manifest_path.exists():
             manifest = read_manifest(manifest_path)
-            data_path = output / (window["name"] + ".txt")
+            data_path = output / (window["name"] + extension)
             require(manifest.get("run_fingerprint") == run["run_fingerprint"] and manifest.get("window") == window
                     and manifest.get("status") == "complete" and type(manifest.get("rows")) is int and manifest["rows"] >= 0,
                     "Completed window manifest is incompatible")
@@ -112,7 +122,7 @@ def _export_locked(config, mapping, source, output, resume, progress):
     columns = mapping["model"]["columns"]
     layout = getattr(source, "layout", None)
     compiled = compile_columns(columns, {name: index for index, name in enumerate(layout)} if layout else None)
-    null_token = config["null_token"]
+    null_token, delimiter, line_ending = config["null_token"], config["delimiter"], config["line_ending"]
     header = [c["target"] for c in columns] if config["header"] else None
     written = skipped = total_rows = 0
     for window in plan["windows"]:
@@ -120,11 +130,11 @@ def _export_locked(config, mapping, source, output, resume, progress):
         if name in completed:
             skipped += 1
             total_rows += completed[name]["rows"]
-            for suffix in (".txt.part", ".json.part"):
+            for suffix in (extension + ".part", ".json.part"):
                 (output / (name + suffix)).unlink(missing_ok=True)
             continue
-        partial = output / (name + ".txt.part")
-        final = output / (name + ".txt")
+        partial = output / (name + extension + ".part")
+        final = output / (name + extension)
         # These are uncommitted artifacts owned by the verified run; restart the whole window.
         for path in (partial, final, output / (name + ".json.part")):
             path.unlink(missing_ok=True)
@@ -136,10 +146,14 @@ def _export_locked(config, mapping, source, output, resume, progress):
             with private_file(partial) as stream:
                 def write(values):
                     nonlocal byte_count
-                    data = record(values, null_token)
+                    data = record(values, null_token, delimiter, line_ending)
                     stream.write(data)
                     digest.update(data)
                     byte_count += len(data)
+                if config["encoding"] == "utf-8-sig":
+                    stream.write(BOM)
+                    digest.update(BOM)
+                    byte_count += len(BOM)
                 if header:
                     write(header)
                 iterator = iter(source.rows(timestamp(window["start"]), timestamp(window["end"])))
