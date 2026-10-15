@@ -57,14 +57,15 @@ def validate_query(text):
 
 def load_config(path):
     path = Path(path).resolve()
-    raw = strict_json(path.read_text(encoding="utf-8"))
+    return check_config(strict_json(path.read_text(encoding="utf-8")), path.parent)
+
+
+def check_config(raw, base):
+    """Validate a config object; relative paths resolve against `base` (the config file's folder)."""
     require(isinstance(raw, dict), "Config must be a JSON object")
     require(REQUIRED <= set(raw), "Config is missing required fields: " + ", ".join(sorted(REQUIRED - set(raw))))
     require(set(raw) <= REQUIRED | OPTIONAL | set(DEFAULTS), "Unknown config field")
-    return check_config(DEFAULTS | raw, path.parent)
-
-
-def check_config(config, base):
+    config = DEFAULTS | raw
     base = Path(base)
     require(type(config["config_version"]) is int and config["config_version"] == 1, "Only config_version 1 is supported")
     require(config["source"] in {"sqlserver", "jsonl"}, "source must be sqlserver or jsonl")

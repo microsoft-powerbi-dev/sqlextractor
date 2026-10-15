@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Required layout for the demo orders extract. One record element per output row. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="Money">
+    <xs:restriction base="xs:decimal">
+      <xs:totalDigits value="18"/>
+      <xs:fractionDigits value="2"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="orders">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="order" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="order_id" type="xs:long"/>
+              <xs:element name="created_at" type="xs:dateTime"/>
+              <xs:element name="customer">
+                <xs:simpleType>
+                  <xs:restriction base="xs:string"><xs:maxLength value="200"/></xs:restriction>
+                </xs:simpleType>
+              </xs:element>
+              <xs:element name="amount" type="Money"/>
+              <xs:element name="status" type="xs:string"/>
+              <xs:element name="note" type="xs:string" minOccurs="0"/>
+              <xs:element name="source_system" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
