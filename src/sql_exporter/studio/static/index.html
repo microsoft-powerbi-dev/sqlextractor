@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapping Studio</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="logo" aria-hidden="true"></span>Mapping Studio <span id="version" class="muted"></span></div>
+  <div class="meta">
+    <label>Mapping <input id="mapping-id" spellcheck="false" autocomplete="off"></label>
+    <label>Version <input id="mapping-version" class="short" spellcheck="false" autocomplete="off"></label>
+    <span id="status-chip" class="chip">unsaved</span>
+  </div>
+  <nav class="actions">
+    <button id="btn-open" type="button">Open</button>
+    <button id="btn-new" type="button">New</button>
+    <button id="btn-devin" type="button" class="accent">Generate with Devin</button>
+    <button id="btn-validate" type="button">Validate</button>
+    <button id="btn-save" type="button">Save draft</button>
+    <button id="btn-approve" type="button" class="primary">Approve &amp; publish</button>
+    <div class="menu">
+      <button id="btn-more" type="button" aria-haspopup="true" aria-expanded="false" title="More actions">More</button>
+      <div id="more-menu" class="menu-list" hidden>
+        <button type="button" data-action="dry-run">Dry run (SQL + files)</button>
+        <button type="button" data-action="preview">Preview on fixture</button>
+        <button type="button" data-action="export">Export</button>
+        <button type="button" data-action="export-resume">Export (resume)</button>
+        <button type="button" data-action="exports">Export history</button>
+        <hr>
+        <button type="button" data-action="import-mapping">Import mapping file</button>
+        <button type="button" data-action="download-json">Download JSON</button>
+        <button type="button" data-action="download-xlsx">Download Excel</button>
+        <hr>
+        <button type="button" data-action="new-version">New version</button>
+        <button type="button" data-action="retire">Retire</button>
+        <button type="button" data-action="audit">Audit log</button>
+      </div>
+    </div>
+  </nav>
+</header>
+<div id="proposal-banner" class="banner" hidden></div>
+<main class="layout" id="layout">
+  <section class="pane source" aria-label="Source">
+    <div class="pane-head">
+      <h2>Source</h2>
+      <select id="source-select" aria-label="Source"></select>
+      <button id="btn-new-source" type="button" title="Add a source">+</button>
+    </div>
+    <div id="source-info" class="pane-sub"></div>
+    <input id="source-filter" class="filter" placeholder="Filter columns" aria-label="Filter source columns">
+    <ul id="source-columns" class="columns"></ul>
+  </section>
+  <section class="flow" id="flow" aria-hidden="true"><div class="hint">Drag a source column onto a target column</div></section>
+  <section class="pane target" aria-label="Target">
+    <div class="pane-head">
+      <h2>Target</h2>
+      <select id="target-select" aria-label="Target"></select>
+      <button id="btn-import-target" type="button" title="Import XSD, Excel, JSON, or sample file">Import</button>
+    </div>
+    <div id="target-info" class="pane-sub"></div>
+    <ul id="target-columns" class="columns"></ul>
+    <div id="new-target-drop" class="dropzone">Drop a source column here to add a target column</div>
+    <div class="pane-foot">
+      <button id="btn-add-derived" type="button">+ Derived column</button>
+      <button id="btn-automap" type="button">Auto-map by name</button>
+    </div>
+  </section>
+  <aside class="inspector" id="inspector" aria-label="Inspector"></aside>
+  <svg id="links" class="links" aria-hidden="true"></svg>
+</main>
+<footer class="issues" id="issues" aria-live="polite"></footer>
+<dialog id="dialog"><form method="dialog" id="dialog-body"></form></dialog>
+<input type="file" id="file-input" hidden>
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

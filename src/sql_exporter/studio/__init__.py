@@ -1,0 +1,1 @@
+"""Mapping Studio web UI."""

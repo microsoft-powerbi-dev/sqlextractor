@@ -20,5 +20,8 @@ sql-exporter = "sql_exporter.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+sql_exporter = ["studio/static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

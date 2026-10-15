@@ -3,7 +3,6 @@ import re
 from pathlib import Path
 
 from .common import ExportError, file_hash, identifier, require, strict_json
-from .config import check_file_pattern
 from .mapping import _read, _rows
 from .transforms import TYPES
 

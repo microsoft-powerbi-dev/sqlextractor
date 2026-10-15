@@ -1,12 +1,10 @@
-import json
-
 import pytest
 
 from sql_exporter import engine
 from sql_exporter.common import ExportError
 from sql_exporter.config import load_config
 from sql_exporter.control import Control
-from sql_exporter.mapping import load_mapping, load_mapping as reload
+from sql_exporter.mapping import load_mapping
 from sql_exporter.sources import JsonlSource
 from sql_exporter.targets import import_target
 from conftest import ROOT
@@ -46,7 +44,7 @@ def test_draft_approve_publish_export(control):
     published = control.approve(saved["id"])
     config = load_config(published["config_path"])
     assert config["file_pattern"] == "{mapping_id}_{start:%Y%m}" and config["source"] == "jsonl"
-    mapping = reload(config["mapping"])
+    mapping = load_mapping(config["mapping"])
     assert mapping["fingerprint"] == saved["fingerprint"]
     result = engine.export(config, mapping, JsonlSource(config, mapping))
     assert result["rows"] == 5 and result["windows_written"] == 36
