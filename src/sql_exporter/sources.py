@@ -88,19 +88,25 @@ class JsonlSource:
         pass
 
 
+def connect(connection_env, connect_timeout=30, query_timeout=300):
+    """The ODBC connection string lives only in the named environment variable."""
+    try:
+        import pyodbc
+    except ImportError as exc:
+        raise ExportError("Cannot load pyodbc; install the sqlserver extra and the system ODBC manager/SQL Server driver (see README)") from exc
+    connection_string = os.environ.get(identifier(connection_env))
+    require(connection_string, f"Set environment variable {connection_env} to an ODBC connection string")
+    connection = pyodbc.connect(connection_string, timeout=connect_timeout, autocommit=True)
+    connection.timeout = query_timeout
+    return connection
+
+
 class SqlServerSource:
     def __init__(self, config, mapping):
         self.config, self.mapping = config, mapping
         self.connection = None
         try:
-            import pyodbc
-        except ImportError as exc:
-            raise ExportError("Cannot load pyodbc; install the sqlserver extra and the system ODBC manager/SQL Server driver (see README)") from exc
-        connection_string = os.environ.get(config["connection_env"])
-        require(connection_string, f"Set environment variable {config['connection_env']} to an ODBC connection string")
-        try:
-            self.connection = pyodbc.connect(connection_string, timeout=config["connect_timeout"], autocommit=True)
-            self.connection.timeout = config["query_timeout"]
+            self.connection = connect(config["connection_env"], config["connect_timeout"], config["query_timeout"])
             cursor = self.connection.cursor()
             try:
                 identity = cursor.execute("SELECT CAST(SERVERPROPERTY('ServerName') AS nvarchar(128)), DB_NAME()").fetchone()
